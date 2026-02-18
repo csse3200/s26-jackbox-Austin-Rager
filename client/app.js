@@ -5,7 +5,8 @@
  */
 
 // Base URL for the API. Use this for all requests (e.g. API_BASE + '/api/join').
-const API_BASE = window.location.origin;
+const API_BASE = "https://unpopulously-ungrimed-pilar.ngrok-free.dev";
+const NGROK_HEADER = {'ngrok-skip-browser-warning': "1"};
 
 // -----------------------------------------------------------------------------
 // State (set after join)
@@ -30,7 +31,24 @@ function joinGame(name) {
   //   onJoined();
   //   startPolling();
   // On error response (e.g. !response.ok), read JSON and call showJoinError(data.error || 'Join failed');
-  showJoinError('TODO: implement joinGame()');
+  fetch(API_BASE + '/api/join',{ 
+    method: 'POST',
+    body: JSON.stringify({ name: name }),
+    headers: { 'Content-Type': 'application/json' },
+  })
+  .then(function (response){
+    return response.json().then(function (data){
+      if (data.player_id) {
+        playerId = data.player_id;
+        playerName = data.name;
+        onJoined();
+        startPolling();
+      }
+    });
+  })
+  .catch(function (error){
+    showJoinError(error.message || 'Join failed');
+  });
 }
 
 function onJoined() {
@@ -57,6 +75,18 @@ function pollState() {
   //   document.getElementById('phase-display').textContent = 'Phase: ' + data.phase + '  Round ' + data.round_id + '/' + data.round_total;
   //   document.getElementById('prompt-display').textContent = data.prompt || '—';
   //   Show/hide #answer-area (phase === 'ANSWER'), #guess-area (phase === 'GUESS'), #results-area (phase === 'RESULTS')
+  fetch(API_BASE + '/api/state', {headers: NGROK_HEADER},)
+    .then(function (response){
+      return response.json();
+    })
+    .then(function (data){
+      document.getElementById('phase-display').textContent = 'Phase: ' + data.phase + '  Round ' + data.round_id + '/' + data.round_total;
+      document.getElementById('prompt-display').textContent = data.prompt || '—';
+      document.getElementById('answer-area').hidden = data.phase !== 'ANSWER';
+      document.getElementById('guess-area').hidden = data.phase !== 'GUESS';
+      document.getElementById('results-area').hidden = data.phase !== 'RESULTS';
+      currentRoundId = data.round_id;
+    })
 }
 
 function startPolling() {
@@ -81,6 +111,28 @@ function submitAnswer() {
   // Headers: { 'Content-Type': 'application/json' }
   // On success: clear input, set #answer-status to "Answer submitted"
   // On error (e.g. 409): read JSON and show data.error in #answer-status with class "status error"
+  fetch(API_BASE + '/api/answer',{
+    method: 'POST',
+    body: JSON.stringify({ player_id: playerId, round_id: currentRoundId, answer: answer }),
+    headers: { 'Content-Type': 'application/json' },
+  })
+  .then(function (response){ return response.json().then(function (data){
+    if (response.ok) {
+      document.getElementById('answer').value = '';
+      const el = document.getElementById('answer-status');
+      el.textContent = 'Answer submitted';
+      el.className = 'status';
+    } else {
+      const el = document.getElementById('answer-status');
+      el.textContent = data.error || 'Submit failed';
+      el.className = 'status error';
+    }
+  })})
+  .catch(function (error){
+    const el = document.getElementById('answer-status');
+    el.textContent = error.message || 'Submit failed';
+    el.className = 'status error';
+  });
 }
 
 // -----------------------------------------------------------------------------
@@ -96,6 +148,28 @@ function submitGuess() {
   // Headers: { 'Content-Type': 'application/json' }
   // On success: clear input, set #guess-status to "Guess submitted"
   // On error: show data.error in #guess-status with class "status error"
+  fetch(API_BASE + '/api/guess',{
+    method: 'POST',
+    body: JSON.stringify({ player_id: playerId, round_id: currentRoundId, guess: guess }),
+    headers: { 'Content-Type': 'application/json' },
+  })
+  .then(function (response){ return response.json().then(function (data){
+    if (response.ok) {
+      document.getElementById('guess').value = '';
+      const el = document.getElementById('guess-status');
+      el.textContent = 'Guess submitted';
+      el.className = 'status';
+    } else {
+      const el = document.getElementById('guess-status');
+      el.textContent = data.error || 'Submit failed';
+      el.className = 'status error';
+    }
+  })})
+  .catch(function (error){
+    const el = document.getElementById('guess-status');
+    el.textContent = error.message || 'Submit failed';
+    el.className = 'status error';
+  });
 }
 
 // -----------------------------------------------------------------------------
